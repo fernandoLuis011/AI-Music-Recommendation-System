@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Recommendation System</title>
+    <!-- Link to the external CSS file for styling -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <!-- Main heading for the app -->
+    <h1>Music Recommendation System</h1>
+
+    <!-- Form for user input -->
+    <form id="recommendationForm">
+
+        <label for="user_id">User ID:</label><br>
+        <input type="text" id="user_id" name="user_id" required><br><br>
+
+        <!-- Input field for song list (comma-separated) -->
+        <label for="song_list">Enter Songs (comma-separated):</label><br>
+        <textarea id="song_list" name="song_list" rows="4" cols="50" required></textarea><br><br>
+
+        <!-- Input field for mood (optional, used only by the Random Forest algorithm) -->
+        <label for="mood">Mood (Optional, for Random Forest):</label><br>
+        <input type="text" id="mood" name="mood"><br><br>
+
+        <!-- Dropdown menu to select the recommendation algorithm -->
+        <label for="algorithm">Recommendation Algorithm:</label><br>
+        <select id="algorithm" name="algorithm" required>
+            <option value="random_forest">Random Forest</option>
+            <option value="kmeans">K-Means</option>
+        </select><br><br>
+
+        <!-- Input field for the number of song recommendations -->
+        <label for="n_songs">Number of Recommendations:</label><br>
+        <input type="number" id="n_songs" name="n_songs" value="10" required><br><br>
+
+        <!-- Button to submit the form and get recommendations -->
+        <button type="button" id="submitButton">Get Recommendations</button>
+        <button type="button" id="pastButton">View Past Recommendations</button>
+    </form>
+
+    <!-- Section to display the results -->
+    <h2>Results:</h2>
+    <div id="results"></div>
+
+    <!-- JavaScript to handle the form submission and display results -->
+    <script>
+        // Event listener for the "Get Recommendations" button
+        document.getElementById("submitButton").addEventListener("click", async () => {
+            // Retrieve user inputs from the form
+            const userId = document.getElementById("user_id").value;
+            const songList = document.getElementById("song_list").value; // Get the song list
+            const mood = document.getElementById("mood").value;         // Get the mood (optional)
+            const algorithm = document.getElementById("algorithm").value; // Get the selected algorithm
+            const nSongs = document.getElementById("n_songs").value;     // Get the number of recommendations
+
+            // Send the form data as a POST request to the Flask backend
+            const response = await fetch("/recommend", {
+                method: "POST", // HTTP method
+                headers: { "Content-Type": "application/json" }, // Set JSON content type
+                body: JSON.stringify({ 
+                    user_id: userId,
+                    song_list: songList, 
+                    mood: mood, 
+                    algorithm: algorithm, 
+                    n_songs: nSongs 
+                }) // Send data as JSON
+            });
+
+            // Parse the response JSON
+            const data = await response.json();
+
+            // Get the results div where the recommendations will be displayed
+            const resultsDiv = document.getElementById("results");
+
+            // Check if the response contains recommendations
+            if (data.recommendations) {
+                // Display each recommendation as a numbered list
+                resultsDiv.innerHTML = data.recommendations.map(
+                    (rec, idx) => `<p>${idx + 1}. ${rec.track_name} by ${rec.artists}</p>`
+                ).join("");
+            } else {
+                // Display an error message if no recommendations were returned
+                resultsDiv.innerHTML = `<p>${data.error}</p>`;
+            }
+        });
+
+        // Add an event listener to the "View Past Recommendations" button
+        document.getElementById("pastButton").addEventListener("click", async () => {
+            // Retrieve the user ID from the input field
+            const userId = document.getElementById("user_id").value;
+
+            // Make an asynchronous GET request to the `/past-recommendations` endpoint with the user ID
+            const response = await fetch(`/past-recommendations?user_id=${userId}`);
+        
+            // Parse the JSON response from the server
+            const data = await response.json();
+
+            // Get the element where the results will be displayed
+            const resultsDiv = document.getElementById("results");
+
+            // If the server responds with an error, display the error message
+            if (data.error) {
+                resultsDiv.innerHTML = `<p>${data.error}</p>`;
+            } else {
+                // If past recommendations are returned, destructure the data
+                const { input_data, recommendations } = data;
+
+                // Populate the results section with the input data and recommended songs
+                resultsDiv.innerHTML = `<h3>Past Recommendations:</h3>
+                    <p><strong>Input Data:</strong> ${JSON.stringify(input_data)}</p> <!-- Display input data -->
+                    <h4>Recommended Songs:</h4>
+                    ${recommendations.map( // Map over recommendations to create a list of songs
+                        (rec, idx) => `<p>${idx + 1}. ${rec['track_name']} by ${rec['artists']}</p>`
+                    ).join("")}`; // Join the list items into a single string and display
+            }
+        });
+
+    </script>
+</body>
+</html>
